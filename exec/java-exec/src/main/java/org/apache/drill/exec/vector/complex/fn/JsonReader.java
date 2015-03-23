@@ -61,6 +61,7 @@ public class JsonReader {
   private DrillBuf workBuf;
   private final List<SchemaPath> columns;
   private final boolean allTextMode;
+  private final boolean allNumeralsAsDoubleMode;
   private boolean atLeastOneWrite = false;
 
   private FieldSelection selection;
@@ -78,14 +79,14 @@ public class JsonReader {
   }
 
   public JsonReader() throws IOException {
-    this(null, false);
+    this(null, false, false);
   }
 
-  public JsonReader(DrillBuf managedBuf, boolean allTextMode) {
-    this(managedBuf, GroupScan.ALL_COLUMNS, allTextMode);
+  public JsonReader(DrillBuf managedBuf, boolean allTextMode, boolean allNumeralsAsDoubleMode) {
+    this(managedBuf, GroupScan.ALL_COLUMNS, allTextMode,allNumeralsAsDoubleMode);
   }
 
-  public JsonReader(DrillBuf managedBuf, List<SchemaPath> columns, boolean allTextMode) {
+  public JsonReader(DrillBuf managedBuf, List<SchemaPath> columns, boolean allTextMode, boolean allNumeralsAsDoubleMode) {
     BufferRecycler recycler = new BufferRecycler();
     IOContext context = new IOContext(recycler, this, false);
     final int features = JsonParser.Feature.collectDefaults() //
@@ -100,6 +101,7 @@ public class JsonReader {
     this.selection = FieldSelection.getFieldSelection(columns);
     this.workBuf = managedBuf;
     this.allTextMode = allTextMode;
+    this.allNumeralsAsDoubleMode = allNumeralsAsDoubleMode;
     this.columns = columns;
   }
 
@@ -204,16 +206,20 @@ public class JsonReader {
   private void writeDataSwitch(MapWriter w) throws IOException{
     if(this.allTextMode){
       writeDataAllText(w, this.selection);
+    }else if(this.allNumeralsAsDoubleMode){
+        writeDataAllText(w, this.selection);
     }else{
-      writeData(w, this.selection);
+        writeData(w, this.selection);
     }
   }
 
   private void writeDataSwitch(ListWriter w) throws IOException{
     if(this.allTextMode){
       writeDataAllText(w);
+    }else if(this.allNumeralsAsDoubleMode){
+        writeDataAllText(w);
     }else{
-      writeData(w);
+        writeData(w);
     }
   }
 
@@ -300,6 +306,74 @@ public class JsonReader {
     map.end();
 
   }
+
+  private void writeDataNumeric(MapWriter map, FieldSelection selection) throws IOException {
+        //
+        map.start();
+        outside: while(true) {
+            if (!map.ok()) {
+                return;
+            }
+            JsonToken t = parser.nextToken();
+            if (t == JsonToken.NOT_AVAILABLE || t == JsonToken.END_OBJECT) {
+                return;
+            }
+
+            assert t == JsonToken.FIELD_NAME : String.format("Expected FIELD_NAME but got %s.", t.name());
+
+            final String fieldName = parser.getText();
+            FieldSelection childSelection = selection.getChild(fieldName);
+            if(childSelection.isNeverValid()){
+                consumeEntireNextValue();
+                continue outside;
+            }
+
+            switch(parser.nextToken()) {
+                case START_ARRAY:
+                    writeDataNumeric(map.list(fieldName));
+                    break;
+                case START_OBJECT:
+                    writeDataNumeric(map.map(fieldName), childSelection);
+                    break;
+                case END_OBJECT:
+                    break outside;
+
+                case VALUE_EMBEDDED_OBJECT:
+                case VALUE_FALSE: {
+                    map.bit(fieldName).writeBit(0);
+                    atLeastOneWrite = true;
+                    break;
+                }
+                case VALUE_TRUE: {
+                    map.bit(fieldName).writeBit(1);
+                    atLeastOneWrite = true;
+                    break;
+                }
+                case VALUE_NULL:
+                    // do check value capacity only if vector is allocated.
+                    if (map.getValueCapacity() > 0) {
+                        map.checkValueCapacity();
+                    }
+                    // do nothing as we don't have a type.
+                    break;
+                case VALUE_NUMBER_FLOAT:
+                case VALUE_NUMBER_INT:
+                    map.float8(fieldName).writeFloat8(parser.getDoubleValue());
+                    atLeastOneWrite = true;
+                    break;
+                case VALUE_STRING:
+                    handleString(parser, map, fieldName);
+                    atLeastOneWrite = true;
+                    break;
+
+                default:
+                    throw new IllegalStateException("Unexpected token " + parser.getCurrentToken());
+
+            }
+        }
+        map.end();
+
+   }
 
 
   private void writeDataAllText(MapWriter map, FieldSelection selection) throws IOException {
@@ -431,6 +505,56 @@ public class JsonReader {
       }
     }
     list.end();
+
+  }
+
+  private void writeDataNumeric(ListWriter list) throws IOException {
+        list.start();
+        outside: while (true) {
+            if (!list.ok()) {
+                return;
+            }
+
+            switch (parser.nextToken()) {
+                case START_ARRAY:
+                    writeDataNumeric(list.list());
+                    break;
+                case START_OBJECT:
+                    writeDataNumeric(list.map(), FieldSelection.ALL_VALID);
+                    break;
+                case END_ARRAY:
+                case END_OBJECT:
+                    break outside;
+
+                case VALUE_EMBEDDED_OBJECT:
+                case VALUE_FALSE:{
+                    list.bit().writeBit(0);
+                    atLeastOneWrite = true;
+                    break;
+                }
+                case VALUE_TRUE: {
+                    list.bit().writeBit(1);
+                    atLeastOneWrite = true;
+                    break;
+                }
+                case VALUE_NULL:
+                    throw new DrillRuntimeException("Null values are not supported in lists be default. " +
+                            "Please set `store.json.all_text_mode` to true to read lists containing nulls. " +
+                            "Be advised that this will treat JSON null values as string containing the word 'null'.");
+                case VALUE_NUMBER_FLOAT:
+                case VALUE_NUMBER_INT:
+                    list.float8().writeFloat8(parser.getDoubleValue());
+                    atLeastOneWrite = true;
+                    break;
+                case VALUE_STRING:
+                    handleString(parser, list);
+                    atLeastOneWrite = true;
+                    break;
+                default:
+                    throw new IllegalStateException("Unexpected token " + parser.getCurrentToken());
+            }
+        }
+        list.end();
 
   }
 

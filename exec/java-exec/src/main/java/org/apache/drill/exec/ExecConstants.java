@@ -105,6 +105,9 @@ public interface ExecConstants {
   public static String JSON_ALL_TEXT_MODE = "store.json.all_text_mode";
   public static OptionValidator JSON_READER_ALL_TEXT_MODE_VALIDATOR = new BooleanValidator(JSON_ALL_TEXT_MODE, false);
 
+  public static String JSON_ALL_NUMERALS_AS_DOUBLE_MODE = "store.json.all_numerals_as_double_mode";
+  public static OptionValidator JSON_READER_ALL_NUMERALS_AS_DOUBLE_MODE_VALIDATOR = new BooleanValidator(JSON_ALL_NUMERALS_AS_DOUBLE_MODE, false);
+
   public static final String FILESYSTEM_PARTITION_COLUMN_LABEL = "drill.exec.storage.file.partition.column.label";
   public static final OptionValidator FILESYSTEM_PARTITION_COLUMN_LABEL_VALIDATOR = new StringValidator(FILESYSTEM_PARTITION_COLUMN_LABEL, "dir");
   public static String MONGO_ALL_TEXT_MODE = "store.mongo.all_text_mode";
