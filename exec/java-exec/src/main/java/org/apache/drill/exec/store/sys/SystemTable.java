@@ -72,7 +72,17 @@ public enum SystemTable {
   public Iterator<Object> getIterator(final FragmentContext context) {
       return new ThreadsIterator(context);
     }
+  },
+
+  STATEMENTS("statements", true, StatementsIterator.StatementsInfo.class) {
+    @Override
+    public Iterator<Object> getIterator(final FragmentContext context) {
+      return new StatementsIterator(context);
+    }
   };
+
+
+
 
 //  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SystemTable.class);
 
