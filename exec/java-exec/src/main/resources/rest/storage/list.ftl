@@ -77,6 +77,12 @@
         <input type="text" class="form-control" id="storageName" placeholder="Storage Name">
       </div>
       <button type="submit" class="btn btn-default" onclick="doSubmit()">Create</button>
+      <br>
+      <div>
+      <label for="file1" class="btn btn-default">Choose an import file &nbsp;&nbsp;</label>
+      <input id="file1" style="visibility:hidden;display:none;" type="file">
+      <button type="submit" class="btn btn-default" onclick="doImport()">Import</button>
+      </div>
     </form>
   </div>
   <script>
@@ -84,6 +90,12 @@
       var name = document.getElementById("storageName");
       var form = document.getElementById("newStorage");
       form.action = "/storage/" + name.value;
+      form.submit();
+    };
+    function doImport() {
+      var file = document.getElementById("file1");
+      var form = document.getElementById("newStorage");
+      form.action = "/storage/import";
       form.submit();
     };
     function doEnable(name, flag) {
