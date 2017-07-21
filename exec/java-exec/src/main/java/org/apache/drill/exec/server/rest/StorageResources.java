@@ -17,8 +17,13 @@
  */
 package org.apache.drill.exec.server.rest;
 
+import java.io.File;
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.StringReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -44,6 +49,9 @@ import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.server.rest.DrillRestServer.UserAuthEnabled;
 import org.apache.drill.exec.store.StoragePlugin;
 import org.apache.drill.exec.store.StoragePluginRegistry;
+import org.apache.http.entity.StringEntity;
+import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
+import org.glassfish.jersey.media.multipart.FormDataParam;
 import org.glassfish.jersey.server.mvc.Viewable;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -140,7 +148,7 @@ public class StorageResources {
   @Produces(MediaType.APPLICATION_JSON)
   public Response exportPlugin(@PathParam("name") String name) {
     Response.ResponseBuilder response = Response.ok(getStoragePluginJSON(name));
-    response.header("Content-Disposition", String.format("attachment;filename=\"%s.plugin.drill\"", name));
+    response.header("Content-Disposition", String.format("attachment;filename=\"%s.json\"", name));
     return response.build();
   }
 
@@ -161,6 +169,41 @@ public class StorageResources {
   @Produces(MediaType.APPLICATION_JSON)
   public JsonResult deletePlugin(@PathParam("name") String name) {
     return deletePluginJSON(name);
+  }
+
+  @POST
+  @Path("/storage/import")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  public JsonResult importPlugin(@FormParam("file") File jsonFile, @FormParam("config") String storagePluginConfig) throws IOException{
+
+    try {
+      StringBuilder stringBuilder = new StringBuilder();
+      BufferedReader reader = new BufferedReader(new FileReader(jsonFile));
+      String line;
+      while ((line = reader.readLine()) != null)
+      {
+        stringBuilder.append(line);
+      }
+      reader.close();
+      String pluginConfig = stringBuilder.toString();
+      String name = jsonFile.getName();
+      if (pluginConfig.contains("\"name\" : ")){
+        name = pluginConfig.substring(pluginConfig.indexOf("\"name\" : "),pluginConfig.indexOf(','));
+      }
+
+      StoragePluginConfig config = mapper.readValue(new StringReader(pluginConfig), StoragePluginConfig.class);
+      return createOrUpdatePluginJSON(new PluginConfigWrapper(name, config));
+    } catch (JsonMappingException e) {
+      logger.info("Error in JSON mapping: {}", storagePluginConfig, e);
+      return message("error (invalid JSON mapping)");
+    } catch (JsonParseException e) {
+      logger.info("Error parsing JSON: {}", storagePluginConfig, e);
+      return message("error (unable to parse JSON)");
+    } catch (IOException e) {
+      logger.info("Failed to read: {}", storagePluginConfig, e);
+      return message("error (unable to read)");
+    }
   }
 
   @POST
