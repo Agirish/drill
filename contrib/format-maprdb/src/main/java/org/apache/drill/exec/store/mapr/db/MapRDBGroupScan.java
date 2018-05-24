@@ -45,6 +45,10 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import io.kubernetes.client.*;
+import io.kubernetes.client.apis.*;
+import io.kubernetes.client.models.*;
+import io.kubernetes.client.util.*;
 
 public abstract class MapRDBGroupScan extends AbstractGroupScan {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBGroupScan.class);
@@ -99,15 +103,29 @@ public abstract class MapRDBGroupScan extends AbstractGroupScan {
     watch.start();
     Map<String, DrillbitEndpoint> endpointMap = new HashMap<String, DrillbitEndpoint>();
     for (DrillbitEndpoint ep : formatPlugin.getContext().getBits()) {
+      logger.info("[AG] DrillbitEndpoint - Node Hostname: {}", ep.getAddress());
       endpointMap.put(ep.getAddress(), ep);
     }
 
+    try {
+      ApiClient client = Config.defaultClient();
+      Configuration.setDefaultApiClient(client);
+
+      CoreV1Api api = new CoreV1Api();
+      V1PodList list = api.listPodForAllNamespaces(null, null, null, null, null, null, null, null, null);
+      for (V1Pod item : list.getItems()) {
+        logger.info("[AG]" + item.getMetadata().getName());
+      }
+    }catch (Exception e){e.printStackTrace();}
+
     Map<DrillbitEndpoint, EndpointAffinity> affinityMap = new HashMap<DrillbitEndpoint, EndpointAffinity>();
     for (String serverName : regionsToScan.values()) {
+      logger.info("[AG] Regions to scan: {} - Node Hostname: {}", serverName, endpointMap.get(serverName).getAddress());
       DrillbitEndpoint ep = endpointMap.get(serverName);
       if (ep != null) {
         EndpointAffinity affinity = affinityMap.get(ep);
         if (affinity == null) {
+          logger.info("[AG] Setting AffinityMap wth {}", ep.getAddress());
           affinityMap.put(ep, new EndpointAffinity(ep, 1));
         } else {
           affinity.addAffinity(1);
@@ -126,6 +144,11 @@ public abstract class MapRDBGroupScan extends AbstractGroupScan {
   public void applyAssignments(List<DrillbitEndpoint> incomingEndpoints) {
     watch.reset();
     watch.start();
+
+    logger.info("[AG] MapRDBGroupScan applyAssignments. Incoming Endpoints are:");
+    for (int i = 0 ; i < incomingEndpoints.size(); i++){
+      logger.info("[AG] Endpoint {}: {}", i, incomingEndpoints.get(i).getAddress());
+    }
 
     final int numSlots = incomingEndpoints.size();
     Preconditions.checkArgument(numSlots <= regionsToScan.size(),
@@ -173,7 +196,9 @@ public abstract class MapRDBGroupScan extends AbstractGroupScan {
        */
       Queue<Integer> endpointIndexlist = endpointHostIndexListMap.get(regionEntry.getValue());
       if (endpointIndexlist != null) {
+
         Integer slotIndex = endpointIndexlist.poll();
+        logger.info("[AG] Region entries {}: {}", regionEntry.getKey(), regionEntry.getValue());
         List<MapRDBSubScanSpec> endpointSlotScanList = endpointFragmentMapping.get(slotIndex);
         endpointSlotScanList.add(getSubScanSpec(regionEntry.getKey()));
         // add to the tail of the slot list, to add more later in round robin fashion
@@ -182,6 +207,7 @@ public abstract class MapRDBGroupScan extends AbstractGroupScan {
         regionsIterator.remove();
       }
     }
+
 
     /*
      * Build priority queues of slots, with ones which has tasks lesser than 'minPerEndpointSlot' and another which have more.
