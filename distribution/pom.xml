@@ -505,7 +505,7 @@
               </execution>
             </executions>
             <configuration>
-              <repository>drill/apache-drill-centos</repository>
+              <repository>${docker.repository}</repository>
               <tag>${project.version}</tag>
               <buildArgs>
                 <VERSION>${project.version}</VERSION>
