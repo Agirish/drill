@@ -145,6 +145,15 @@ public class StorageResources {
     return response.build();
   }
 
+  @GET
+  @Path("/storage/{name}/exportAll")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response exportAllPlugins(@PathParam("name") String name) {
+    Response.ResponseBuilder response = Response.ok(getStoragePluginsJSON());
+    response.header("Content-Disposition", String.format("attachment;filename=\"drillStoragePlugins.json\""));
+    return response.build();
+  }
+
   @DELETE
   @Path("/storage/{name}.json")
   @Produces(MediaType.APPLICATION_JSON)
