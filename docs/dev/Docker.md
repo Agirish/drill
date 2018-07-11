@@ -57,12 +57,17 @@ To build an Apache Drill docker image, you need to have the following software i
    
     cd distribution
     mvn dockerfile:push -Pdocker
+    
+  To push the image to a different repository,
+  
+    cd distribution
+    mvn dockerfile:push -Pdocker -Pdocker.repository=<my_repo>
 
 ## Run Docker Container
    
    Running the Docker container should start Drill in embedded mode and connect to Sqlline
     
-    docker run -i -t drill/apache-drill:1.14.0-SNAPSHOT /bin/bash
+    docker run -i -t drill/apache-drill:1.14.0 /bin/bash
     Jun 29, 2018 3:28:21 AM org.glassfish.jersey.server.ApplicationHandler initialize
     INFO: Initiating Jersey application, version Jersey: 2.8 2014-04-29 01:25:26...
     apache drill 1.14.0-SNAPSHOT 
@@ -71,7 +76,7 @@ To build an Apache Drill docker image, you need to have the following software i
     +------------------+
     |     version      |
     +------------------+
-    | 1.14.0-SNAPSHOT  |
+    | 1.14.0  |
     +------------------+
     1 row selected (0.28 seconds)
       
@@ -83,7 +88,7 @@ To build an Apache Drill docker image, you need to have the following software i
     docker exec -it <CONTAINER_ID> bash
     
     $ /opt/drill/bin/drill-localhost 
-     apache drill 1.14.0-SNAPSHOT 
+     apache drill 1.14.0 
      "drill baby drill"
      0: jdbc:drill:drillbit=localhost>
 
