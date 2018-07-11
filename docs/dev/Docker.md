@@ -73,11 +73,11 @@ To build an Apache Drill docker image, you need to have the following software i
     apache drill 1.14.0-SNAPSHOT 
     "json ain't no thang"
     0: jdbc:drill:zk=local> select version from sys.version;
-    +------------------+
-    |     version      |
-    +------------------+
-    | 1.14.0  |
-    +------------------+
+    +------------+
+    |  version   |
+    +------------+
+    | 1.14.0     |
+    +------------+
     1 row selected (0.28 seconds)
       
 
