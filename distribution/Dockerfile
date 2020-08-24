@@ -25,8 +25,11 @@ FROM openjdk:8u232-jdk
 ARG VERSION
 
 RUN mkdir /opt/drill
-
 COPY target/apache-drill-$VERSION/apache-drill-$VERSION /opt/drill
 
-# Starts Drill in embedded mode and connects to Sqlline
-ENTRYPOINT /opt/drill/bin/drill-embedded
+# Copy Scripts
+COPY conf/* /opt/drill/conf/
+COPY scripts/* /opt/drill/bin/
+
+# Start Drill
+ENTRYPOINT /opt/drill/bin/start.sh
